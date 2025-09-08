@@ -72,6 +72,20 @@ router.get("/me", (req, res) => {
   res.json({ ok: true, user });
 });
 
+// GET /users (ดึงรายชื่อผู้ใช้ทั้งหมด ยกเว้นตัวเอง)
+router.get("/users", async (req, res) => {
+  const user = (req.session as any).user as SessionUser | undefined;
+  if (!user)
+    return res.status(401).json({ ok: false, message: "Not authenticated" });
+
+  // ดึงผู้ใช้ทั้งหมด ยกเว้นตัวเอง
+  const [rows] = await pool.query(
+    "SELECT id, username, fullname, email FROM accounts WHERE id != ?",
+    [user.id]
+  );
+  res.json({ ok: true, users: rows });
+});
+
 // POST /logout
 router.post("/logout", (req, res) => {
   req.session.destroy(() => res.json({ ok: true }));
