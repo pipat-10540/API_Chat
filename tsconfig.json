@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "es6",
+    "module": "commonjs",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": [
+    "src/**/*.ts"  // รวมไฟล์ทั้งหมดใน src ที่มีนามสกุล .ts
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
+}
