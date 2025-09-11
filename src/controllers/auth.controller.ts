@@ -3,6 +3,7 @@ import { pool } from "../db";
 import { sha512 } from "js-sha512";
 import { pusher } from "../pusher";
 import type { SessionUser } from "../types";
+import nodemailer from "nodemailer";
 
 export default class AuthController {
   //#region POST /register
@@ -93,6 +94,76 @@ export default class AuthController {
   //#region // POST /logout
   async logout(req: Request, res: Response) {
     req.session.destroy(() => res.json({ ok: true }));
+  }
+  //#endregion
+
+  //#region forgotPassword
+  async forgotPassword(req: Request, res: Response) {
+    const { email } = req.body;
+    console.log("REQ BODY:", req.body);
+    if (!email) {
+      return res.status(200).json({
+        success: false,
+        message: "⚠️ กรุณากรอกอีเมล",
+        statusCode: 200,
+      });
+    }
+
+    try {
+      // ค้นหาผู้ใช้งานใน DB
+      const [rows]: any = await pool.query(
+        "SELECT id, email, fullname FROM accounts WHERE email = ?",
+        [email]
+      );
+      if (rows.length === 0) {
+        return res.status(200).json({
+          success: false,
+          message: "❌ ไม่พบผู้ใช้งานนี้",
+          statusCode: 200,
+        });
+      }
+
+      const user = rows[0];
+
+      // 🔐 สร้างลิงก์สำหรับรีเซ็ตรหัสผ่าน (ในระบบจริงควรมี token ด้วย)
+      const resetLink = `http://localhost:3000/reset-password?user=${user.id}`;
+
+      // ✉️ สร้าง transporter ส่งเมลผ่าน Gmail
+      const transporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: {
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASS,
+        },
+      });
+
+      // 📨 ส่งอีเมล
+      await transporter.sendMail({
+        from: `"Tissue" <${process.env.EMAIL_USER}>`,
+        to: user.email,
+        subject: "รีเซ็ตรหัสผ่านของคุณ",
+        html: `
+        <p>สวัสดีคุณ ${user.fullname},</p>
+        <p>เราได้รับคำขอรีเซ็ตรหัสผ่านของคุณ</p>
+        <p>คลิก <a href="${resetLink}">ที่นี่</a> เพื่อรีเซ็ตรหัสผ่านของคุณ</p>
+        <p>หากคุณไม่ได้ร้องขอ กรุณาเพิกเฉยอีเมลนี้</p>
+        <br />
+        <p>ขอบคุณค่ะ<br/>Tissue Support</p>
+      `,
+      });
+
+      return res.status(200).json({
+        success: true,
+        message:
+          "✅ ส่งอีเมลสำหรับรีเซ็ตรหัสผ่านไปยังอีเมลที่ลงทะเบียนไว้แล้ว กรุณาตรวจสอบอีเมลของคุณ",
+        statusCode: 200,
+      });
+    } catch (err: any) {
+      console.error("❌ Send Mail Error:", err);
+      return res
+        .status(404)
+        .json({ success: false, message: "เกิดข้อผิดพลาด", statusCode: 404 });
+    }
   }
   //#endregion
 }
