@@ -1,6 +1,6 @@
 import express from "express";
 import authRoutes from "../auth"; // เพิ่มบรรทัดนี้
-import SignInRoutes from "./login.routes";
+import SignInRoutes from "./routes";
 import chatRoutes from "./chat";
 
 const router = express.Router();
