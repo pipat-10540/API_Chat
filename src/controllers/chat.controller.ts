@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { pool } from "../db";
+import { pusher } from "../pusher"; // เพิ่ม Pusher กลับมา
 
 export default class ChatController {
   //#region // GET /conversations
@@ -106,12 +107,35 @@ export default class ChatController {
     if (members.length === 0)
       return res.status(403).json({ ok: false, message: "Forbidden" });
     // บันทึกข้อความ
-    await pool.query(
+    const [result]: any = await pool.query(
       "INSERT INTO messages (conversation_id, sender_id, text) VALUES (?, ?, ?)",
       [conversationId, user.id, text]
     );
-    // TODO: broadcast ผ่าน Pusher ที่นี่ (ถ้าต้องการ)
-    res.json({ ok: true });
+
+    // 🚀 Pusher real-time messaging
+    const messageData = {
+      id: result.insertId,
+      conversation_id: conversationId,
+      sender_id: user.id,
+      text: text,
+      created_at: new Date().toISOString(),
+      sender: {
+        id: user.id,
+        username: user.username,
+        fullname: user.fullname,
+      },
+    };
+
+    // ส่งข้อความไปยัง channel ของ conversation นี้
+    pusher
+      .trigger(
+        `conversation-${conversationId}`, // channel name
+        "new-message", // event name
+        messageData // payload
+      )
+      .catch((err: any) => console.error("Pusher error:", err));
+
+    res.json({ ok: true, messageId: result.insertId });
   }
   //#endregion
 }
