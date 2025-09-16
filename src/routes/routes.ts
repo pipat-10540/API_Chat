@@ -25,7 +25,7 @@ class SignInRoutes {
     this.router.get("/messages", this.chatController.getMessages);
     this.router.post("/messages", this.chatController.sendMessage);
     this.router.post("/forgot-password", this.authController.forgotPassword);
-    
+    this.router.post("/reset-password", this.authController.resetPassword);
   }
 }
 export default new SignInRoutes().router;

@@ -1,9 +1,11 @@
 import { Request, Response, Router } from "express";
 import { pool } from "../db";
-import { sha512 } from "js-sha512";
+// import { sha512 } from "js-sha512";
 import { pusher } from "../pusher";
 import type { SessionUser } from "../types";
 import nodemailer from "nodemailer";
+import { apiResponse } from "../model/Response/response_standard";
+import bcrypt from "bcrypt";
 
 export default class AuthController {
   //#region POST /register
@@ -26,9 +28,8 @@ export default class AuthController {
         .json({ ok: false, message: "Email or username already exists" });
     }
 
-    // บันทึก ticket เป็น hash
-    const hashedTicket = sha512(ticket);
-
+    // บันทึก ticket เป็น bcrypt hash
+    const hashedTicket = await bcrypt.hash(ticket, 10);
     await pool.query(
       "INSERT INTO accounts (username, ticket, email, fullname) VALUES (?, ?, ?, ?)",
       [username, hashedTicket, email, fullname]
@@ -47,22 +48,27 @@ export default class AuthController {
         .json({ ok: false, message: "Missing email or ticket" });
     }
 
+    // ดึง user ตาม email
     const [rows] = await pool.query(
-      "SELECT id, username, email, fullname, ticket FROM accounts WHERE email=? AND ticket=?",
-      [email, sha512(ticket)]
+      "SELECT id, username, email, fullname, ticket FROM accounts WHERE email=?",
+      [email]
     );
-
     const list = rows as Array<any>;
     if (list.length === 1) {
-      const u: SessionUser = {
-        id: list[0].id,
-        email: list[0].email,
-        username: list[0].username,
-        fullname: list[0].fullname,
-        isAdmin: list[0].username === "admin",
-      };
-      (req.session as any).user = u;
-      return res.json({ ok: true, user: u });
+      const user = list[0];
+      // ตรวจสอบรหัสผ่านด้วย bcrypt
+      const match = await bcrypt.compare(ticket, user.ticket);
+      if (match) {
+        const u: SessionUser = {
+          id: user.id,
+          email: user.email,
+          username: user.username,
+          fullname: user.fullname,
+          isAdmin: user.username === "admin",
+        };
+        (req.session as any).user = u;
+        return res.json({ ok: true, user: u });
+      }
     }
     return res.status(401).json({ ok: false, message: "Invalid credentials" });
   }
@@ -160,6 +166,39 @@ export default class AuthController {
       });
     } catch (err: any) {
       console.error("❌ Send Mail Error:", err);
+      return res
+        .status(404)
+        .json({ success: false, message: "เกิดข้อผิดพลาด", statusCode: 404 });
+    }
+  }
+  //#endregion
+
+  //#region resetPassword
+  async resetPassword(
+    req: Request,
+    res: Response<apiResponse>
+  ): Promise<Response<apiResponse>> {
+    const { userId, newPassword } = req.body;
+
+    try {
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+      const [result]: any = await pool.query(
+        "UPDATE accounts SET ticket = ? WHERE id = ?",
+        [hashedPassword, userId]
+      );
+      if (result.affectedRows === 0) {
+        return res
+          .status(200)
+          .json({ success: false, message: "❌ ไม่พบผู้ใช้", statusCode: 200 });
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: "✅ รีเซ็ตรหัสผ่านสำเร็จ",
+        statusCode: 200,
+      });
+    } catch (error: any) {
+      console.error("❌ Reset Error:", error);
       return res
         .status(404)
         .json({ success: false, message: "เกิดข้อผิดพลาด", statusCode: 404 });

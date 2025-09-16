@@ -1,0 +1,19 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Install express-mysql-session",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"install",
+				"express-mysql-session"
+			],
+			"isBackground": false,
+			"problemMatcher": [
+				"$eslint-stylish"
+			],
+			"group": "build"
+		}
+	]
+}
