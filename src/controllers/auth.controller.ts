@@ -81,25 +81,25 @@ export default class AuthController {
   async me(req: Request, res: Response) {
     const user = (req.session as any).user as SessionUser | undefined;
     if (!user) return res.status(401).json({ ok: false });
-    
+
     // ดึงข้อมูล user รวมทั้งรูปโปรไฟล์
     const [rows] = await pool.query(
       "SELECT id, username, fullname, email, profile_image FROM accounts WHERE id = ?",
       [user.id]
     );
     const userWithImage = (rows as any[])[0];
-    
+
     // ส่ง URL สำหรับรูปโปรไฟล์ (ถ้ามี)
-    const profileImageUrl = userWithImage.profile_image 
-      ? `/api/profile-image/${user.id}` 
+    const profileImageUrl = userWithImage.profile_image
+      ? `/api/profile-image/${user.id}`
       : null;
-    
-    res.json({ 
-      ok: true, 
+
+    res.json({
+      ok: true,
       user: {
         ...user,
-        profileImageUrl
-      }
+        profileImageUrl,
+      },
     });
   }
   //#endregion
@@ -115,14 +115,14 @@ export default class AuthController {
       "SELECT id, username, fullname, email, profile_image FROM accounts WHERE id != ?",
       [user.id]
     );
-    
+
     // เพิ่ม URL สำหรับรูปโปรไฟล์
-    const usersWithImageUrl = (rows as any[]).map(u => ({
+    const usersWithImageUrl = (rows as any[]).map((u) => ({
       ...u,
       profileImageUrl: u.profile_image ? `/api/profile-image/${u.id}` : null,
-      profile_image: undefined // ลบ BLOB ออกจาก response
+      profile_image: undefined, // ลบ BLOB ออกจาก response
     }));
-    
+
     res.json({ ok: true, users: usersWithImageUrl });
   }
   //#endregion
@@ -240,29 +240,30 @@ export default class AuthController {
   async getProfileImage(req: Request, res: Response) {
     try {
       const { userId } = req.params;
-      
+
       const [rows] = await pool.query(
         "SELECT profile_image FROM accounts WHERE id = ?",
         [userId]
       );
       const list = rows as Array<any>;
-      
+
       if (list.length === 0) {
         return res.status(404).json({ ok: false, message: "User not found" });
       }
-      
+
       const profileImage = list[0].profile_image;
       if (!profileImage) {
-        return res.status(404).json({ ok: false, message: "No profile image found" });
+        return res
+          .status(404)
+          .json({ ok: false, message: "No profile image found" });
       }
-      
+
       // ส่งรูปภาพเป็น binary data
       res.set({
-        'Content-Type': 'image/jpeg', // หรือ image/png ตามที่ต้องการ
-        'Content-Length': profileImage.length,
+        "Content-Type": "image/jpeg", // หรือ image/png ตามที่ต้องการ
+        "Content-Length": profileImage.length,
       });
       res.send(profileImage);
-      
     } catch (error: any) {
       console.error("❌ Get Profile Image Error:", error);
       return res.status(500).json({ ok: false, message: "เกิดข้อผิดพลาด" });
