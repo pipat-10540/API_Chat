@@ -2,6 +2,8 @@ import { Router } from "express";
 import SigninController from "../controllers/login.controller";
 import AuthController from "../controllers/auth.controller";
 import ChatController from "../controllers/chat.controller";
+import multer from "multer";
+const upload = multer();
 
 class SignInRoutes {
   router = Router();
@@ -19,7 +21,12 @@ class SignInRoutes {
     this.router.get("/me", this.authController.me);
     this.router.get("/users", this.authController.users);
     this.router.post("/logout", this.authController.logout);
-    this.router.post("/register", this.authController.register);
+    this.router.post(
+      "/register",
+      upload.single("image"),
+      this.authController.register
+    );
+    
     this.router.get("/conversations", this.chatController.getConversations);
     this.router.post("/conversations", this.chatController.createConversation);
     this.router.get("/messages", this.chatController.getMessages);

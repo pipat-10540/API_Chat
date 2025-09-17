@@ -9,8 +9,11 @@ import bcrypt from "bcrypt";
 
 export default class AuthController {
   //#region POST /register
+  // ใน route: upload.single('image')
   async register(req: Request, res: Response) {
     const { username, ticket, email, fullname } = req.body ?? {};
+    const profile_image = req.file ? req.file.buffer : null;
+
     if (!username || !ticket || !email || !fullname) {
       return res
         .status(400)
@@ -31,8 +34,8 @@ export default class AuthController {
     // บันทึก ticket เป็น bcrypt hash
     const hashedTicket = await bcrypt.hash(ticket, 10);
     await pool.query(
-      "INSERT INTO accounts (username, ticket, email, fullname) VALUES (?, ?, ?, ?)",
-      [username, hashedTicket, email, fullname]
+      "INSERT INTO accounts (username, ticket, email, fullname, profile_image) VALUES (?, ?, ?, ?, ?)",
+      [username, hashedTicket, email, fullname, profile_image]
     );
 
     return res.json({ ok: true, message: "Register success" });
