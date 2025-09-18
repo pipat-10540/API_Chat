@@ -30,6 +30,11 @@ class SignInRoutes {
       "/profile-image/:userId",
       this.authController.getProfileImage
     );
+    this.router.put(
+      "/profile",
+      upload.single("image"),
+      this.authController.updateProfile
+    );
 
     this.router.get("/conversations", this.chatController.getConversations);
     this.router.post("/conversations", this.chatController.createConversation);

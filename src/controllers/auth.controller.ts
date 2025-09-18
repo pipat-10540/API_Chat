@@ -42,6 +42,105 @@ export default class AuthController {
   }
   //#endregion
 
+  //#region PUT /profile
+  // ใน route: upload.single('image')
+  async updateProfile(req: Request, res: Response) {
+    const user = (req.session as any).user as SessionUser | undefined;
+    if (!user) {
+      return res.status(401).json({ ok: false, message: "Not authenticated" });
+    }
+
+    const { username, email, fullname } = req.body ?? {};
+    const profile_image = req.file ? req.file.buffer : null;
+
+    // ตรวจสอบว่ามีการส่งข้อมูลมาอย่างน้อย 1 field
+    if (!username && !email && !fullname && !profile_image) {
+      return res.status(400).json({ ok: false, message: "No data to update" });
+    }
+
+    try {
+      // สร้าง dynamic query สำหรับ update เฉพาะ field ที่มีการส่งมา
+      const updateFields: string[] = [];
+      const updateValues: any[] = [];
+
+      if (username) {
+        // ตรวจสอบซ้ำ username (ยกเว้นตัวเอง)
+        const [existsUsername] = await pool.query(
+          "SELECT id FROM accounts WHERE username=? AND id != ?",
+          [username, user.id]
+        );
+        if ((existsUsername as any[]).length > 0) {
+          return res
+            .status(409)
+            .json({ ok: false, message: "Username already exists" });
+        }
+        updateFields.push("username = ?");
+        updateValues.push(username);
+      }
+
+      if (email) {
+        // ตรวจสอบซ้ำ email (ยกเว้นตัวเอง)
+        const [existsEmail] = await pool.query(
+          "SELECT id FROM accounts WHERE email=? AND id != ?",
+          [email, user.id]
+        );
+        if ((existsEmail as any[]).length > 0) {
+          return res
+            .status(409)
+            .json({ ok: false, message: "Email already exists" });
+        }
+        updateFields.push("email = ?");
+        updateValues.push(email);
+      }
+
+      if (fullname) {
+        updateFields.push("fullname = ?");
+        updateValues.push(fullname);
+      }
+
+      if (profile_image) {
+        updateFields.push("profile_image = ?");
+        updateValues.push(profile_image);
+      }
+
+      // เพิ่ม user id สำหรับ WHERE clause
+      updateValues.push(user.id);
+
+      // ทำการ update
+      const updateQuery = `UPDATE accounts SET ${updateFields.join(
+        ", "
+      )} WHERE id = ?`;
+      const [result] = await pool.query(updateQuery, updateValues);
+
+      if ((result as any).affectedRows === 0) {
+        return res.status(404).json({ ok: false, message: "User not found" });
+      }
+
+      // อัพเดท session data ถ้ามีการเปลี่ยน username, email, fullname
+      if (username || email || fullname) {
+        const updatedUser: SessionUser = {
+          ...user,
+          ...(username && { username }),
+          ...(email && { email }),
+          ...(fullname && { fullname }),
+        };
+        (req.session as any).user = updatedUser;
+      }
+
+      return res.json({
+        ok: true,
+        message: "Profile updated successfully",
+        user: (req.session as any).user,
+      });
+    } catch (error: any) {
+      console.error("❌ Update Profile Error:", error);
+      return res
+        .status(500)
+        .json({ ok: false, message: "Internal server error" });
+    }
+  }
+  //#endregion
+
   //#region  POST /login
   async login(req: Request, res: Response) {
     const { email, ticket } = req.body ?? {};
